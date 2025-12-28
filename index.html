@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hand Controlled Car Game</title>
+<style>
+body { margin:0; overflow:hidden; background:black }
+#car {
+  width:60px;
+  height:100px;
+  background:red;
+  position:absolute;
+  bottom:30px;
+  left:50%;
+  transform:translateX(-50%);
+}
+</style>
+</head>
+<body>
+
+<video id="video" autoplay hidden></video>
+<div id="car"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const car = document.getElementById("car");
+let carX = window.innerWidth / 2;
+
+const hands = new Hands({
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+
+hands.setOptions({
+  maxNumHands:1,
+  minDetectionConfidence:0.7
+});
+
+hands.onResults(res => {
+  if(res.multiHandLandmarks.length){
+    let x = res.multiHandLandmarks[0][8].x;
+    carX = x * window.innerWidth;
+    car.style.left = carX + "px";
+  }
+});
+
+const cam = new Camera(document.getElementById("video"),{
+  onFrame: async()=>{ await hands.send({image:video}) },
+  width:640,height:480
+});
+cam.start();
+</script>
+
+</body>
+</html>
