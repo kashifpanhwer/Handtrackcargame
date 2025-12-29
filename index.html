@@ -4,327 +4,215 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Controlled Galaxy</title>
-    
-    <!-- MediaPipe Libraries for Hand Tracking -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <title>3D Gesture Particles</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            overflow: hidden; /* Scrollbar hatane ke liye */
-            font-family: 'Courier New', Courier, monospace;
-        }
+        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        #video_input { display: none; }
 
-        /* Galaxy Canvas */
-        #galaxyCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-
-        /* Hidden Video Element (Processing ke liye) */
-        .input_video {
-            display: none;
-        }
-
-        /* UI Overlay */
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.85);
-            color: white;
-            transition: opacity 0.5s;
-        }
-
-        h1 {
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            text-align: center;
-            color: #00d2ff;
-            text-shadow: 0 0 20px #00d2ff;
-        }
-
-        p {
-            max-width: 600px;
-            text-align: center;
-            line-height: 1.6;
-            margin-bottom: 30px;
-            color: #ddd;
-        }
-
-        #startBtn {
-            padding: 15px 40px;
-            font-size: 18px;
-            background: transparent;
-            color: #00d2ff;
-            border: 2px solid #00d2ff;
-            border-radius: 30px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transition: 0.3s;
-            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
-        }
-
-        #startBtn:hover {
-            background: #00d2ff;
-            color: black;
-            box-shadow: 0 0 30px rgba(0, 210, 255, 0.8);
-        }
-
-        #loading {
-            display: none;
-            margin-top: 20px;
-            color: #ff00de;
-        }
-
-        /* Small camera preview in corner */
-        #previewCanvas {
+        /* Modern UI Panel */
+        #ui-panel {
             position: absolute;
             bottom: 20px;
-            right: 20px;
-            width: 160px;
-            height: 120px;
-            z-index: 5;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
-            opacity: 0.7;
-            transform: scaleX(-1); /* Mirror effect */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            padding: 15px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            z-index: 100;
         }
 
-        @media screen and (max-width: 600px) {
-            h1 { font-size: 20px; }
-            #previewCanvas { width: 100px; height: 75px; }
+        select, input[type="color"] {
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 12px;
+            border-radius: 20px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        #status {
+            position: fixed;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: cyan;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-    <!-- UI Overlay -->
-    <div id="overlay">
-        <h1>Galaxy Hand Control</h1>
-        <p>Apne hath (Index Finger) ka use karke Galaxy ko move karein.<br>Mobile aur Laptop dono par kaam karega.<br><br>Camera Access Allow karein.</p>
-        <button id="startBtn">Start Experience</button>
-        <div id="loading">Loading AI Model... Please wait...</div>
+    <div id="status">Loading AI Models...</div>
+    <video id="video_input"></video>
+
+    <div id="ui-panel">
+        <select id="templateSelect">
+            <option value="heart">❤️ Heart</option>
+            <option value="saturn">🪐 Saturn</option>
+            <option value="flower">🌸 Flower</option>
+            <option value="fireworks">🎆 Fireworks</option>
+            <option value="sphere">🔮 Sphere</option>
+        </select>
+        <input type="color" id="particleColor" value="#00f2ff">
     </div>
 
-    <!-- Main Visuals -->
-    <canvas id="galaxyCanvas"></canvas>
-    
-    <!-- Camera Preview (Optional visible feedback) -->
-    <canvas id="previewCanvas"></canvas>
-
-    <!-- Hidden Video Source -->
-    <video class="input_video" playsinline></video>
-
     <script>
-        // --- GALAXY ANIMATION SETUP ---
-        const canvas = document.getElementById('galaxyCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        let width, height;
-        let stars = [];
-        const numStars = 800; // Number of stars
-        const speed = 4; // Star speed
-        
-        // Mouse/Hand position (Target)
-        let targetX = 0;
-        let targetY = 0;
-        
-        // Smoothed position
-        let currentX = 0;
-        let currentY = 0;
+        let scene, camera, renderer, particles, geometry;
+        let particleCount = 5000;
+        let targetPositions = [];
+        let currentPositions = [];
+        let lerpSpeed = 0.05;
+        let handScale = 1;
 
-        function resize() {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
+        // --- 1. Three.js Initialization ---
+        function initScene() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
 
-        class Star {
-            constructor() {
-                this.reset(true);
-            }
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-            reset(initial = false) {
-                this.x = (Math.random() - 0.5) * width * 2;
-                this.y = (Math.random() - 0.5) * height * 2;
-                this.z = initial ? Math.random() * width : width;
-                this.pz = this.z;
-                this.color = `hsl(${Math.random() * 360}, 80%, 80%)`;
-            }
-
-            update() {
-                // Move star towards camera (z-axis decreases)
-                this.z -= speed;
-                
-                // Reset if it passes the screen
-                if (this.z < 1) {
-                    this.reset();
-                }
-            }
-
-            draw() {
-                // 3D Projection math
-                // Shift origin based on hand position (Parallax effect)
-                let offsetX = (width / 2) + (currentX - width / 2) * 2;
-                let offsetY = (height / 2) + (currentY - height / 2) * 2;
-
-                const sx = (this.x / this.z) * width + offsetX;
-                const sy = (this.y / this.z) * height + offsetY;
-
-                const r = (1 - this.z / width) * 4; // Size based on depth
-
-                // Previous position for trail effect
-                const px = (this.x / this.pz) * width + offsetX;
-                const py = (this.y / this.pz) * height + offsetY;
-
-                this.pz = this.z;
-
-                if (sx < 0 || sx > width || sy < 0 || sy > height) return;
-
-                ctx.beginPath();
-                ctx.moveTo(px, py);
-                ctx.lineTo(sx, sy);
-                ctx.strokeStyle = this.color;
-                ctx.lineWidth = r;
-                ctx.stroke();
-                
-                // Draw star glow
-                ctx.beginPath();
-                ctx.arc(sx, sy, r * 0.5, 0, Math.PI * 2);
-                ctx.fillStyle = "white";
-                ctx.fill();
-            }
-        }
-
-        // Initialize Stars
-        for (let i = 0; i < numStars; i++) {
-            stars.push(new Star());
-        }
-
-        function animateGalaxy() {
-            // Background clear with fade for trails
-            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
-            ctx.fillRect(0, 0, width, height);
-
-            // Smooth interpolation for hand movement
-            currentX += (targetX - currentX) * 0.1;
-            currentY += (targetY - currentY) * 0.1;
-
-            stars.forEach(star => {
-                star.update();
-                star.draw();
-            });
-
-            requestAnimationFrame(animateGalaxy);
-        }
-
-        // --- HAND TRACKING SETUP (MediaPipe) ---
-        const videoElement = document.getElementsByClassName('input_video')[0];
-        const previewCanvas = document.getElementById('previewCanvas');
-        const previewCtx = previewCanvas.getContext('2d');
-        const startBtn = document.getElementById('startBtn');
-        const loadingText = document.getElementById('loading');
-        const overlay = document.getElementById('overlay');
-
-        let camera = null;
-
-        // Initialize Hands
-        const hands = new Hands({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-        }});
-
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-
-        hands.onResults(onResults);
-
-        function onResults(results) {
-            // Draw camera preview
-            previewCtx.save();
-            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
-            previewCtx.drawImage(results.image, 0, 0, previewCanvas.width, previewCanvas.height);
+            geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount * 3; i++) positions[i] = 0;
             
-            // Check if hand is detected
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const hand = results.multiHandLandmarks[0];
-                
-                // Landmark 8 is the Index Finger Tip
-                const fingerTip = hand[8];
-                
-                // Draw a dot on the preview canvas
-                previewCtx.fillStyle = "#00d2ff";
-                previewCtx.beginPath();
-                previewCtx.arc(fingerTip.x * previewCanvas.width, fingerTip.y * previewCanvas.height, 5, 0, 2 * Math.PI);
-                previewCtx.fill();
-
-                // Map coordinates to galaxy control
-                // Note: We mirror X (1 - x) because webcam is mirrored
-                targetX = (1 - fingerTip.x) * width;
-                targetY = fingerTip.y * height;
-            }
-            previewCtx.restore();
-        }
-
-        // Start Button Logic
-        startBtn.addEventListener('click', () => {
-            startBtn.style.display = 'none';
-            loadingText.style.display = 'block';
-
-            // Initialize Camera
-            camera = new Camera(videoElement, {
-                onFrame: async () => {
-                    await hands.send({image: videoElement});
-                },
-                width: 640,
-                height: 480
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const material = new THREE.PointsMaterial({
+                size: 0.03,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
 
-            camera.start()
-                .then(() => {
-                    console.log("Camera started");
-                    overlay.style.opacity = 0;
-                    setTimeout(() => {
-                        overlay.style.display = 'none';
-                    }, 500);
-                    // Start Galaxy Loop
-                    animateGalaxy();
-                })
-                .catch(err => {
-                    console.error("Error:", err);
-                    alert("Camera start nahi ho saka. Kripya permissions check karein aur HTTPS/Localhost use karein.");
-                    loadingText.innerText = "Error: Camera Access Denied";
-                });
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            setTemplate('heart');
+            animate();
+        }
+
+        // --- 2. Shape Templates ---
+        function setTemplate(shape) {
+            targetPositions = [];
+            for (let i = 0; i < particleCount; i++) {
+                let x = 0, y = 0, z = 0;
+                const t = Math.random() * Math.PI * 2;
+                const u = Math.random() * 2 - 1;
+
+                if (shape === 'heart') {
+                    const angle = Math.random() * Math.PI * 2;
+                    x = 16 * Math.pow(Math.sin(angle), 3) / 10;
+                    y = (13 * Math.cos(angle) - 5 * Math.cos(2*angle) - 2 * Math.cos(3*angle) - Math.cos(4*angle)) / 10;
+                    z = (Math.random() - 0.5) * 0.5;
+                } else if (shape === 'saturn') {
+                    if (i < particleCount * 0.4) { // Planet
+                        const r = 1.2;
+                        x = r * Math.sqrt(1 - u*u) * Math.cos(t);
+                        y = r * Math.sqrt(1 - u*u) * Math.sin(t);
+                        z = r * u;
+                    } else { // Rings
+                        const r = 1.8 + Math.random() * 0.7;
+                        x = r * Math.cos(t);
+                        y = r * Math.sin(t) * 0.3;
+                        z = r * Math.sin(t) * 0.5;
+                    }
+                } else if (shape === 'flower') {
+                    const r = 1.5 * Math.cos(5 * t);
+                    x = r * Math.cos(t);
+                    y = r * Math.sin(t);
+                    z = u * 0.5;
+                } else if (shape === 'fireworks') {
+                    const r = Math.pow(Math.random(), 2) * 3;
+                    x = r * Math.sqrt(1 - u*u) * Math.cos(t);
+                    y = r * Math.sqrt(1 - u*u) * Math.sin(t);
+                    z = r * u;
+                } else { // Sphere
+                    const r = 2;
+                    x = r * Math.sqrt(1 - u*u) * Math.cos(t);
+                    y = r * Math.sqrt(1 - u*u) * Math.sin(t);
+                    z = r * u;
+                }
+                targetPositions.push(x, y, z);
+            }
+        }
+
+        // --- 3. Hand Tracking ---
+        const videoElement = document.getElementById('video_input');
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        hands.onResults((results) => {
+            document.getElementById('status').innerText = results.multiHandLandmarks.length > 0 ? "Gesture Active" : "Show your hand to the camera";
+            
+            if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Rotation based on hand position
+                particles.rotation.y = (landmarks[0].x - 0.5) * 4;
+                particles.rotation.x = (landmarks[0].y - 0.5) * 4;
+
+                // Scaling based on hand "Tension" (Distance between Thumb Tip(4) and Pinky Tip(20))
+                const dx = landmarks[4].x - landmarks[20].x;
+                const dy = landmarks[4].y - landmarks[20].y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                // Map distance to scale (Open hand = large, Fist = small)
+                handScale = THREE.MathUtils.lerp(handScale, distance * 5, 0.1);
+            }
         });
 
-        // Default center position
-        targetX = width / 2;
-        targetY = height / 2;
-        currentX = width / 2;
-        currentY = height / 2;
+        const camera_mp = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640, height: 480
+        });
+        camera_mp.start();
 
+        // --- 4. Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const positions = geometry.attributes.position.array;
+            for (let i = 0; i < particleCount * 3; i++) {
+                // Move towards target + Apply hand scale
+                const target = targetPositions[i] * handScale;
+                positions[i] += (target - positions[i]) * lerpSpeed;
+            }
+            
+            geometry.attributes.position.needsUpdate = true;
+            particles.material.color.set(document.getElementById('particleColor').value);
+            
+            // Subtle floating rotation
+            particles.rotation.z += 0.002;
+            
+            renderer.render(scene, camera);
+        }
+
+        // --- 5. UI Listeners ---
+        document.getElementById('templateSelect').addEventListener('change', (e) => setTemplate(e.target.value));
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        initScene();
     </script>
 </body>
 </html>
