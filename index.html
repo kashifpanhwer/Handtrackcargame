@@ -1,877 +1,330 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gesture-Controlled 3D Car Game</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Hand Controlled Galaxy</title>
+    
+    <!-- MediaPipe Libraries for Hand Tracking -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
     <style>
-        * {
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000;
+            overflow: hidden; /* Scrollbar hatane ke liye */
+            font-family: 'Courier New', Courier, monospace;
         }
-        
-        body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
-            min-height: 100vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        
-        h1 {
-            font-size: 2.8rem;
-            background: linear-gradient(90deg, #00dbde, #fc00ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        .subtitle {
-            font-size: 1.2rem;
-            color: #a0a0c0;
-            margin-bottom: 20px;
-        }
-        
-        .game-area {
-            display: flex;
-            width: 100%;
-            gap: 30px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .camera-section, .game-section {
-            flex: 1;
-            min-width: 300px;
-            max-width: 600px;
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 20px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .section-title {
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: #4fc3f7;
-        }
-        
-        .section-title i {
-            font-size: 1.8rem;
-        }
-        
-        .camera-container {
-            position: relative;
-            width: 100%;
-            height: 300px;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #000;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transform: scaleX(-1);
-        }
-        
-        #canvas {
+
+        /* Galaxy Canvas */
+        #galaxyCanvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
         }
-        
-        .camera-overlay {
+
+        /* Hidden Video Element (Processing ke liye) */
+        .input_video {
+            display: none;
+        }
+
+        /* UI Overlay */
+        #overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.7);
             z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
             transition: opacity 0.5s;
         }
-        
-        .permission-btn {
-            background: linear-gradient(90deg, #00dbde, #fc00ff);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            font-size: 1.1rem;
-            border-radius: 50px;
+
+        h1 {
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-align: center;
+            color: #00d2ff;
+            text-shadow: 0 0 20px #00d2ff;
+        }
+
+        p {
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ddd;
+        }
+
+        #startBtn {
+            padding: 15px 40px;
+            font-size: 18px;
+            background: transparent;
+            color: #00d2ff;
+            border: 2px solid #00d2ff;
+            border-radius: 30px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            transition: transform 0.3s, box-shadow 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: 0.3s;
+            box-shadow: 0 0 15px rgba(0, 210, 255, 0.4);
         }
-        
-        .permission-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0, 219, 222, 0.4);
+
+        #startBtn:hover {
+            background: #00d2ff;
+            color: black;
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.8);
         }
-        
-        .game-container {
-            position: relative;
-            width: 100%;
-            height: 400px;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #0d1b2a;
-            margin-bottom: 20px;
-        }
-        
-        #gameCanvas {
-            width: 100%;
-            height: 100%;
-        }
-        
-        .controls-info {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
+
+        #loading {
+            display: none;
             margin-top: 20px;
+            color: #ff00de;
         }
-        
-        .control-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 15px;
-            border-radius: 10px;
-            border-left: 4px solid #00dbde;
-        }
-        
-        .control-icon {
-            width: 50px;
-            height: 50px;
-            background: rgba(0, 219, 222, 0.1);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            color: #00dbde;
-        }
-        
-        .control-text h3 {
-            font-size: 1rem;
-            margin-bottom: 5px;
-            color: #4fc3f7;
-        }
-        
-        .control-text p {
-            font-size: 0.9rem;
-            color: #a0a0c0;
-        }
-        
-        .game-stats {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
-            border-radius: 15px;
-        }
-        
-        .stat {
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #00dbde;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            font-size: 0.9rem;
-            color: #a0a0c0;
-        }
-        
-        .hand-status {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 15px;
-            margin-top: 20px;
-        }
-        
-        .hand-icon {
-            font-size: 2rem;
-            color: #4caf50;
-        }
-        
-        .hand-detected {
-            color: #4caf50;
-        }
-        
-        .hand-not-detected {
-            color: #f44336;
-        }
-        
-        .instructions {
-            margin-top: 30px;
-            text-align: center;
-            color: #a0a0c0;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            max-width: 800px;
-        }
-        
-        .hidden {
-            display: none !important;
-        }
-        
-        @media (max-width: 768px) {
-            .game-area {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .camera-section, .game-section {
-                width: 100%;
-            }
-            
-            h1 {
-                font-size: 2rem;
-            }
-        }
-        
-        /* Game elements styling */
-        .road {
+
+        /* Small camera preview in corner */
+        #previewCanvas {
             position: absolute;
-            width: 100%;
-            height: 100%;
-            background: #2c3e50;
+            bottom: 20px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            z-index: 5;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            opacity: 0.7;
+            transform: scaleX(-1); /* Mirror effect */
         }
-        
-        .lane {
-            position: absolute;
-            width: 10px;
-            height: 100%;
-            background: #f1c40f;
-        }
-        
-        .center-lane {
-            left: 50%;
-            transform: translateX(-50%);
+
+        @media screen and (max-width: 600px) {
+            h1 { font-size: 20px; }
+            #previewCanvas { width: 100px; height: 75px; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-car"></i> Gesture-Controlled 3D Car</h1>
-            <p class="subtitle">Move your hand in front of the camera to control the car</p>
-        </header>
-        
-        <div class="game-area">
-            <div class="camera-section">
-                <h2 class="section-title"><i class="fas fa-camera"></i> Hand Camera Control</h2>
-                <div class="camera-container">
-                    <div class="camera-overlay" id="cameraOverlay">
-                        <button class="permission-btn" id="permissionBtn">
-                            <i class="fas fa-video"></i> Enable Camera for Hand Control
-                        </button>
-                        <p style="margin-top: 15px; text-align: center; color: #a0a0c0;">
-                            Camera access required for hand gesture detection
-                        </p>
-                    </div>
-                    <video id="video" autoplay playsinline></video>
-                    <canvas id="canvas"></canvas>
-                </div>
-                
-                <div class="hand-status">
-                    <i class="fas fa-hand-paper hand-icon"></i>
-                    <div>
-                        <h3>Hand Status: <span id="handStatusText" class="hand-not-detected">Not Detected</span></h3>
-                        <p id="handPosition">Move your hand in front of the camera</p>
-                    </div>
-                </div>
-                
-                <div class="controls-info">
-                    <div class="control-item">
-                        <div class="control-icon">
-                            <i class="fas fa-hand-point-left"></i>
-                        </div>
-                        <div class="control-text">
-                            <h3>Steering</h3>
-                            <p>Move hand left/right to steer</p>
-                        </div>
-                    </div>
-                    
-                    <div class="control-item">
-                        <div class="control-icon">
-                            <i class="fas fa-hand-rock"></i>
-                        </div>
-                        <div class="control-text">
-                            <h3>Acceleration</h3>
-                            <p>Move hand forward/backward</p>
-                        </div>
-                    </div>
-                    
-                    <div class="control-item">
-                        <div class="control-icon">
-                            <i class="fas fa-hand-peace"></i>
-                        </div>
-                        <div class="control-text">
-                            <h3>Brake</h3>
-                            <p>Close hand to brake</p>
-                        </div>
-                    </div>
-                    
-                    <div class="control-item">
-                        <div class="control-icon">
-                            <i class="fas fa-redo"></i>
-                        </div>
-                        <div class="control-text">
-                            <h3>Reset Car</h3>
-                            <p>Show peace sign to reset</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="game-section">
-                <h2 class="section-title"><i class="fas fa-gamepad"></i> 3D Car Game</h2>
-                <div class="game-container">
-                    <canvas id="gameCanvas"></canvas>
-                </div>
-                
-                <div class="game-stats">
-                    <div class="stat">
-                        <div class="stat-value" id="speedValue">0</div>
-                        <div class="stat-label">SPEED (km/h)</div>
-                    </div>
-                    
-                    <div class="stat">
-                        <div class="stat-value" id="distanceValue">0</div>
-                        <div class="stat-label">DISTANCE (m)</div>
-                    </div>
-                    
-                    <div class="stat">
-                        <div class="stat-value" id="timeValue">0</div>
-                        <div class="stat-label">TIME (s)</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="instructions">
-            <p><i class="fas fa-info-circle"></i> Instructions: Allow camera access, then move your hand in front of the camera to control the car. 
-            Move left/right to steer, forward to accelerate, backward to decelerate. Close your fist to brake, and show a peace sign to reset the car position.</p>
-        </div>
+
+    <!-- UI Overlay -->
+    <div id="overlay">
+        <h1>Galaxy Hand Control</h1>
+        <p>Apne hath (Index Finger) ka use karke Galaxy ko move karein.<br>Mobile aur Laptop dono par kaam karega.<br><br>Camera Access Allow karein.</p>
+        <button id="startBtn">Start Experience</button>
+        <div id="loading">Loading AI Model... Please wait...</div>
     </div>
 
+    <!-- Main Visuals -->
+    <canvas id="galaxyCanvas"></canvas>
+    
+    <!-- Camera Preview (Optional visible feedback) -->
+    <canvas id="previewCanvas"></canvas>
+
+    <!-- Hidden Video Source -->
+    <video class="input_video" playsinline></video>
+
     <script>
-        // Game state
-        const gameState = {
-            speed: 0,
-            distance: 0,
-            time: 0,
-            steering: 0,
-            handDetected: false,
-            handX: 0.5,
-            handY: 0.5,
-            handGesture: 'none'
-        };
-        
-        // DOM Elements
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const gameCanvas = document.getElementById('gameCanvas');
-        const cameraOverlay = document.getElementById('cameraOverlay');
-        const permissionBtn = document.getElementById('permissionBtn');
-        const handStatusText = document.getElementById('handStatusText');
-        const handPosition = document.getElementById('handPosition');
-        const speedValue = document.getElementById('speedValue');
-        const distanceValue = document.getElementById('distanceValue');
-        const timeValue = document.getElementById('timeValue');
-        
-        // Canvas contexts
+        // --- GALAXY ANIMATION SETUP ---
+        const canvas = document.getElementById('galaxyCanvas');
         const ctx = canvas.getContext('2d');
-        const gameCtx = gameCanvas.getContext('2d');
         
-        // Set canvas dimensions
-        function resizeCanvas() {
-            const container = document.querySelector('.camera-container');
-            canvas.width = container.clientWidth;
-            canvas.height = container.clientHeight;
-            
-            const gameContainer = document.querySelector('.game-container');
-            gameCanvas.width = gameContainer.clientWidth;
-            gameCanvas.height = gameContainer.clientHeight;
+        let width, height;
+        let stars = [];
+        const numStars = 800; // Number of stars
+        const speed = 4; // Star speed
+        
+        // Mouse/Hand position (Target)
+        let targetX = 0;
+        let targetY = 0;
+        
+        // Smoothed position
+        let currentX = 0;
+        let currentY = 0;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
         }
-        
-        // Initialize game
-        function initGame() {
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            
-            // Start game loop
-            requestAnimationFrame(gameLoop);
-            
-            // Start hand detection simulation (in a real app, this would use TensorFlow.js or MediaPipe)
-            simulateHandDetection();
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Star {
+            constructor() {
+                this.reset(true);
+            }
+
+            reset(initial = false) {
+                this.x = (Math.random() - 0.5) * width * 2;
+                this.y = (Math.random() - 0.5) * height * 2;
+                this.z = initial ? Math.random() * width : width;
+                this.pz = this.z;
+                this.color = `hsl(${Math.random() * 360}, 80%, 80%)`;
+            }
+
+            update() {
+                // Move star towards camera (z-axis decreases)
+                this.z -= speed;
+                
+                // Reset if it passes the screen
+                if (this.z < 1) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                // 3D Projection math
+                // Shift origin based on hand position (Parallax effect)
+                let offsetX = (width / 2) + (currentX - width / 2) * 2;
+                let offsetY = (height / 2) + (currentY - height / 2) * 2;
+
+                const sx = (this.x / this.z) * width + offsetX;
+                const sy = (this.y / this.z) * height + offsetY;
+
+                const r = (1 - this.z / width) * 4; // Size based on depth
+
+                // Previous position for trail effect
+                const px = (this.x / this.pz) * width + offsetX;
+                const py = (this.y / this.pz) * height + offsetY;
+
+                this.pz = this.z;
+
+                if (sx < 0 || sx > width || sy < 0 || sy > height) return;
+
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(sx, sy);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = r;
+                ctx.stroke();
+                
+                // Draw star glow
+                ctx.beginPath();
+                ctx.arc(sx, sy, r * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = "white";
+                ctx.fill();
+            }
         }
-        
-        // Request camera permission
-        permissionBtn.addEventListener('click', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        width: { ideal: 640 },
-                        height: { ideal: 480 },
-                        facingMode: "user" 
-                    } 
+
+        // Initialize Stars
+        for (let i = 0; i < numStars; i++) {
+            stars.push(new Star());
+        }
+
+        function animateGalaxy() {
+            // Background clear with fade for trails
+            ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+            ctx.fillRect(0, 0, width, height);
+
+            // Smooth interpolation for hand movement
+            currentX += (targetX - currentX) * 0.1;
+            currentY += (targetY - currentY) * 0.1;
+
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            requestAnimationFrame(animateGalaxy);
+        }
+
+        // --- HAND TRACKING SETUP (MediaPipe) ---
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const loadingText = document.getElementById('loading');
+        const overlay = document.getElementById('overlay');
+
+        let camera = null;
+
+        // Initialize Hands
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        hands.onResults(onResults);
+
+        function onResults(results) {
+            // Draw camera preview
+            previewCtx.save();
+            previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            previewCtx.drawImage(results.image, 0, 0, previewCanvas.width, previewCanvas.height);
+            
+            // Check if hand is detected
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const hand = results.multiHandLandmarks[0];
+                
+                // Landmark 8 is the Index Finger Tip
+                const fingerTip = hand[8];
+                
+                // Draw a dot on the preview canvas
+                previewCtx.fillStyle = "#00d2ff";
+                previewCtx.beginPath();
+                previewCtx.arc(fingerTip.x * previewCanvas.width, fingerTip.y * previewCanvas.height, 5, 0, 2 * Math.PI);
+                previewCtx.fill();
+
+                // Map coordinates to galaxy control
+                // Note: We mirror X (1 - x) because webcam is mirrored
+                targetX = (1 - fingerTip.x) * width;
+                targetY = fingerTip.y * height;
+            }
+            previewCtx.restore();
+        }
+
+        // Start Button Logic
+        startBtn.addEventListener('click', () => {
+            startBtn.style.display = 'none';
+            loadingText.style.display = 'block';
+
+            // Initialize Camera
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({image: videoElement});
+                },
+                width: 640,
+                height: 480
+            });
+
+            camera.start()
+                .then(() => {
+                    console.log("Camera started");
+                    overlay.style.opacity = 0;
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 500);
+                    // Start Galaxy Loop
+                    animateGalaxy();
+                })
+                .catch(err => {
+                    console.error("Error:", err);
+                    alert("Camera start nahi ho saka. Kripya permissions check karein aur HTTPS/Localhost use karein.");
+                    loadingText.innerText = "Error: Camera Access Denied";
                 });
-                
-                video.srcObject = stream;
-                cameraOverlay.classList.add('hidden');
-                
-                // Start hand detection
-                startHandDetection();
-            } catch (err) {
-                console.error("Error accessing camera:", err);
-                alert("Cannot access camera. Please check permissions.");
-                
-                // Even if camera fails, simulate hand detection for demo
-                cameraOverlay.classList.add('hidden');
-                startHandDetection();
-            }
         });
-        
-        // Start hand detection (simulated for this demo)
-        function startHandDetection() {
-            gameState.handDetected = true;
-            handStatusText.textContent = "Detected";
-            handStatusText.className = "hand-detected";
-            
-            // In a real implementation, you would use TensorFlow.js or MediaPipe here
-            // For this demo, we'll simulate hand tracking with mouse/touch
-            simulateHandControl();
-        }
-        
-        // Simulate hand control with mouse/touch
-        function simulateHandControl() {
-            // Mouse/touch controls for desktop/mobile
-            canvas.addEventListener('mousemove', handlePointerMove);
-            canvas.addEventListener('touchmove', handlePointerMove);
-            
-            // Gesture detection (closing hand for brake)
-            let fistTimer = null;
-            
-            canvas.addEventListener('mousedown', () => {
-                gameState.handGesture = 'fist';
-                clearTimeout(fistTimer);
-                fistTimer = setTimeout(() => {
-                    gameState.handGesture = 'none';
-                }, 500);
-            });
-            
-            canvas.addEventListener('mouseup', () => {
-                gameState.handGesture = 'none';
-            });
-            
-            // Peace sign gesture (reset)
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'r' || e.key === 'R') {
-                    resetCar();
-                }
-            });
-        }
-        
-        function handlePointerMove(e) {
-            const rect = canvas.getBoundingClientRect();
-            let x, y;
-            
-            if (e.type === 'touchmove') {
-                e.preventDefault();
-                x = e.touches[0].clientX - rect.left;
-                y = e.touches[0].clientY - rect.top;
-            } else {
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
-            }
-            
-            // Normalize coordinates (0 to 1)
-            gameState.handX = x / rect.width;
-            gameState.handY = y / rect.height;
-            
-            // Update hand position display
-            handPosition.textContent = `Hand Position: X: ${Math.round(gameState.handX * 100)}%, Y: ${Math.round(gameState.handY * 100)}%`;
-            
-            // Draw hand position on canvas
-            drawHandTracking();
-        }
-        
-        // Draw hand tracking visualization
-        function drawHandTracking() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw video frame
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
-            
-            // Draw hand position circle
-            const x = gameState.handX * canvas.width;
-            const y = gameState.handY * canvas.height;
-            
-            // Draw hand circle
-            ctx.beginPath();
-            ctx.arc(x, y, 30, 0, Math.PI * 2);
-            ctx.fillStyle = gameState.handGesture === 'fist' ? 'rgba(244, 67, 54, 0.7)' : 'rgba(76, 175, 80, 0.7)';
-            ctx.fill();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.stroke();
-            
-            // Draw gesture indicator
-            if (gameState.handGesture === 'fist') {
-                ctx.font = 'bold 20px Arial';
-                ctx.fillStyle = '#FFFFFF';
-                ctx.textAlign = 'center';
-                ctx.fillText('BRAKING', x, y - 40);
-            }
-        }
-        
-        // Simulate hand detection for demo purposes
-        function simulateHandDetection() {
-            setInterval(() => {
-                if (!gameState.handDetected) {
-                    // Simulate random hand movement for demo
-                    gameState.handX += (Math.random() - 0.5) * 0.1;
-                    gameState.handY += (Math.random() - 0.5) * 0.05;
-                    
-                    // Keep within bounds
-                    gameState.handX = Math.max(0.1, Math.min(0.9, gameState.handX));
-                    gameState.handY = Math.max(0.1, Math.min(0.9, gameState.handY));
-                    
-                    // Update display
-                    handPosition.textContent = `Hand Position: X: ${Math.round(gameState.handX * 100)}%, Y: ${Math.round(gameState.handY * 100)}%`;
-                    
-                    // Draw hand tracking
-                    drawHandTracking();
-                }
-            }, 100);
-        }
-        
-        // Game objects
-        const car = {
-            x: 0,
-            y: 0,
-            width: 60,
-            height: 120,
-            color: '#e74c3c',
-            speed: 0,
-            maxSpeed: 200,
-            acceleration: 0.5,
-            deceleration: 0.2,
-            steering: 0,
-            maxSteering: 0.05,
-            rotation: 0,
-            wheelAngle: 0
-        };
-        
-        const road = {
-            width: 400,
-            lanes: 3,
-            markings: []
-        };
-        
-        // Initialize road markings
-        for (let i = 0; i < 20; i++) {
-            road.markings.push({
-                x: Math.random() * road.width,
-                y: -i * 100,
-                width: 10,
-                height: 30
-            });
-        }
-        
-        // Game loop
-        function gameLoop(timestamp) {
-            updateGame();
-            renderGame();
-            requestAnimationFrame(gameLoop);
-        }
-        
-        // Update game state
-        function updateGame() {
-            // Update car based on hand position
-            updateCarFromHand();
-            
-            // Update car position
-            car.x += Math.sin(car.rotation) * car.speed;
-            car.y += Math.cos(car.rotation) * car.speed;
-            
-            // Update road markings
-            road.markings.forEach(marking => {
-                marking.y += car.speed;
-                if (marking.y > gameCanvas.height) {
-                    marking.y = -100;
-                    marking.x = Math.random() * road.width;
-                }
-            });
-            
-            // Update game stats
-            gameState.speed = Math.abs(car.speed * 10);
-            gameState.distance += gameState.speed / 3600;
-            gameState.time += 1/60;
-            
-            // Update UI
-            speedValue.textContent = Math.round(gameState.speed);
-            distanceValue.textContent = Math.round(gameState.distance);
-            timeValue.textContent = Math.round(gameState.time);
-        }
-        
-        // Update car controls based on hand position
-        function updateCarFromHand() {
-            // Steering based on hand X position (0 = left, 1 = right)
-            const targetSteering = (gameState.handX - 0.5) * 2 * car.maxSteering;
-            car.steering += (targetSteering - car.steering) * 0.1;
-            
-            // Rotation based on steering
-            car.rotation += car.steering;
-            car.wheelAngle = car.steering * 10;
-            
-            // Speed based on hand Y position (0 = top = forward, 1 = bottom = reverse)
-            const targetSpeed = (0.5 - gameState.handY) * car.maxSpeed;
-            
-            // If hand is making a fist (braking)
-            if (gameState.handGesture === 'fist') {
-                car.speed *= 0.9; // Quick deceleration
-            } else {
-                // Normal acceleration/deceleration
-                if (Math.abs(targetSpeed) > Math.abs(car.speed)) {
-                    // Accelerate
-                    car.speed += (targetSpeed > car.speed ? car.acceleration : -car.acceleration);
-                } else {
-                    // Decelerate
-                    car.speed *= 0.98;
-                }
-            }
-            
-            // Limit speed
-            if (Math.abs(car.speed) > car.maxSpeed) {
-                car.speed = car.maxSpeed * (car.speed > 0 ? 1 : -1);
-            }
-        }
-        
-        // Reset car position
-        function resetCar() {
-            car.x = gameCanvas.width / 2;
-            car.y = gameCanvas.height / 2;
-            car.speed = 0;
-            car.rotation = 0;
-            car.steering = 0;
-            gameState.distance = 0;
-            gameState.time = 0;
-        }
-        
-        // Render game
-        function renderGame() {
-            // Clear canvas
-            gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-            
-            // Draw road
-            drawRoad();
-            
-            // Draw road markings
-            drawRoadMarkings();
-            
-            // Draw car
-            drawCar();
-            
-            // Draw HUD
-            drawHUD();
-        }
-        
-        // Draw road
-        function drawRoad() {
-            // Road background
-            gameCtx.fillStyle = '#34495e';
-            gameCtx.fillRect(gameCanvas.width/2 - road.width/2, 0, road.width, gameCanvas.height);
-            
-            // Road edges
-            gameCtx.strokeStyle = '#f1c40f';
-            gameCtx.lineWidth = 4;
-            gameCtx.beginPath();
-            gameCtx.moveTo(gameCanvas.width/2 - road.width/2, 0);
-            gameCtx.lineTo(gameCanvas.width/2 - road.width/2, gameCanvas.height);
-            gameCtx.moveTo(gameCanvas.width/2 + road.width/2, 0);
-            gameCtx.lineTo(gameCanvas.width/2 + road.width/2, gameCanvas.height);
-            gameCtx.stroke();
-            
-            // Lane markings
-            const laneWidth = road.width / road.lanes;
-            gameCtx.strokeStyle = '#ffffff';
-            gameCtx.lineWidth = 2;
-            gameCtx.setLineDash([20, 20]);
-            
-            for (let i = 1; i < road.lanes; i++) {
-                gameCtx.beginPath();
-                gameCtx.moveTo(gameCanvas.width/2 - road.width/2 + laneWidth * i, 0);
-                gameCtx.lineTo(gameCanvas.width/2 - road.width/2 + laneWidth * i, gameCanvas.height);
-                gameCtx.stroke();
-            }
-            
-            gameCtx.setLineDash([]);
-        }
-        
-        // Draw road markings
-        function drawRoadMarkings() {
-            gameCtx.fillStyle = '#f1c40f';
-            road.markings.forEach(marking => {
-                gameCtx.fillRect(
-                    gameCanvas.width/2 - road.width/2 + marking.x, 
-                    marking.y, 
-                    marking.width, 
-                    marking.height
-                );
-            });
-        }
-        
-        // Draw car
-        function drawCar() {
-            // Save context for transformation
-            gameCtx.save();
-            
-            // Move to car position
-            gameCtx.translate(gameCanvas.width/2, gameCanvas.height/2);
-            gameCtx.rotate(car.rotation);
-            
-            // Car body
-            gameCtx.fillStyle = car.color;
-            gameCtx.fillRect(-car.width/2, -car.height/2, car.width, car.height);
-            
-            // Car details
-            gameCtx.fillStyle = '#2c3e50';
-            gameCtx.fillRect(-car.width/2 + 5, -car.height/2 + 5, car.width - 10, 30); // Windshield
-            gameCtx.fillRect(-car.width/2 + 5, -car.height/2 + 50, car.width - 10, 40); // Windows
-            
-            // Headlights
-            gameCtx.fillStyle = '#f1c40f';
-            gameCtx.fillRect(-car.width/2 + 5, -car.height/2 + 5, 10, 8);
-            gameCtx.fillRect(car.width/2 - 15, -car.height/2 + 5, 10, 8);
-            
-            // Wheels
-            gameCtx.fillStyle = '#2c3e50';
-            
-            // Front wheels (steering)
-            gameCtx.save();
-            gameCtx.translate(-car.width/2 + 15, -car.height/2 + 20);
-            gameCtx.rotate(car.wheelAngle);
-            gameCtx.fillRect(-8, -5, 16, 10);
-            gameCtx.restore();
-            
-            gameCtx.save();
-            gameCtx.translate(car.width/2 - 15, -car.height/2 + 20);
-            gameCtx.rotate(car.wheelAngle);
-            gameCtx.fillRect(-8, -5, 16, 10);
-            gameCtx.restore();
-            
-            // Rear wheels
-            gameCtx.fillRect(-car.width/2 + 15, car.height/2 - 15, 16, 10);
-            gameCtx.fillRect(car.width/2 - 31, car.height/2 - 15, 16, 10);
-            
-            // Restore context
-            gameCtx.restore();
-        }
-        
-        // Draw HUD
-        function drawHUD() {
-            // Speedometer
-            gameCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            gameCtx.fillRect(20, 20, 200, 80);
-            
-            gameCtx.fillStyle = '#00dbde';
-            gameCtx.font = 'bold 24px Arial';
-            gameCtx.fillText('SPEED', 30, 50);
-            
-            gameCtx.fillStyle = '#ffffff';
-            gameCtx.font = 'bold 36px Arial';
-            gameCtx.fillText(Math.round(gameState.speed) + ' km/h', 30, 85);
-            
-            // Steering indicator
-            gameCtx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            gameCtx.fillRect(gameCanvas.width - 220, 20, 200, 80);
-            
-            gameCtx.fillStyle = '#00dbde';
-            gameCtx.font = 'bold 24px Arial';
-            gameCtx.fillText('STEERING', gameCanvas.width - 210, 50);
-            
-            // Steering bar
-            const steeringX = gameCanvas.width - 110 + (car.steering / car.maxSteering) * 80;
-            gameCtx.fillStyle = '#e74c3c';
-            gameCtx.fillRect(gameCanvas.width - 190, 65, 160, 20);
-            gameCtx.fillStyle = '#f1c40f';
-            gameCtx.fillRect(steeringX - 5, 60, 10, 30);
-            
-            // Hand control indicator
-            if (gameState.handDetected) {
-                gameCtx.fillStyle = 'rgba(76, 175, 80, 0.7)';
-                gameCtx.font = 'bold 18px Arial';
-                gameCtx.fillText('HAND CONTROL ACTIVE', gameCanvas.width/2 - 100, gameCanvas.height - 30);
-            }
-        }
-        
-        // Initialize everything when page loads
-        window.addEventListener('load', initGame);
-        
-        // Reset car on R key press
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'r' || e.key === 'R') {
-                resetCar();
-            }
-        });
+
+        // Default center position
+        targetX = width / 2;
+        targetY = height / 2;
+        currentX = width / 2;
+        currentY = height / 2;
+
     </script>
 </body>
 </html>
