@@ -1,107 +1,104 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
-<title>Hand Control With Camera</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
+<title>JARVIS AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-html,body{
+body{
   margin:0;
-  height:100%;
-  background:#000;
-  overflow:hidden;
+  background:black;
+  color:#00ffe1;
+  font-family:Arial;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
 }
-video{
-  position:absolute;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  transform:scaleX(-1);
-}
-canvas{
-  position:absolute;
-  top:0;left:0;
-}
-#info{
-  position:fixed;
-  top:10px;
-  width:100%;
+.box{
+  border:1px solid #00ffe1;
+  padding:25px;
+  border-radius:20px;
+  box-shadow:0 0 25px #00ffe1;
   text-align:center;
-  color:#0ff;
-  font-family:sans-serif;
+  width:300px;
+}
+.circle{
+  width:120px;
+  height:120px;
+  border-radius:50%;
+  border:3px solid #00ffe1;
+  margin:15px auto;
+  animation:pulse 2s infinite;
+}
+@keyframes pulse{
+  0%{box-shadow:0 0 10px #00ffe1}
+  50%{box-shadow:0 0 40px #00ffe1}
+  100%{box-shadow:0 0 10px #00ffe1}
+}
+button{
+  background:#00ffe1;
+  border:none;
+  padding:10px 25px;
+  border-radius:30px;
+  cursor:pointer;
+}
+#status{
+  margin-top:15px;
+  font-size:14px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="info">Show Hand</div>
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
+<div class="box">
+  <h2>🤖 JARVIS</h2>
+  <div class="circle"></div>
+  <button onclick="start()">🎙️ Talk</button>
+  <div id="status">Idle...</div>
+</div>
 
 <script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const info = document.getElementById("info");
+const API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
 
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+recognition.lang = "en-US";
+recognition.interimResults = false;
 
-let x = canvas.width/2;
-let y = canvas.height/2;
-let open = true;
-
-const hands = new Hands({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-
-hands.setOptions({
-  maxNumHands:1,
-  modelComplexity:0,
-  minDetectionConfidence:0.6
-});
-
-hands.onResults(res=>{
-  if(res.multiHandLandmarks){
-    const lm = res.multiHandLandmarks[0];
-
-    // Hand position
-    x = (1-lm[8].x)*canvas.width;
-    y = lm[8].y*canvas.height;
-
-    // OPEN / CLOSE (fist detect)
-    const d = Math.hypot(lm[8].x-lm[4].x,lm[8].y-lm[4].y);
-    open = d > 0.08;
-
-    info.innerText = open ? "HAND OPEN" : "HAND CLOSED";
-  }else{
-    info.innerText = "Show Hand";
-  }
-});
-
-const camera = new Camera(video,{
-  onFrame: async()=>await hands.send({image:video}),
-  width:480,height:360
-});
-camera.start();
-
-function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  ctx.fillStyle = open ? "#00ffff" : "#ff0044";
-  ctx.beginPath();
-  ctx.arc(x,y, open ? 40 : 20 ,0,Math.PI*2);
-  ctx.fill();
-
-  requestAnimationFrame(draw);
+function start(){
+  document.getElementById("status").innerText = "Listening...";
+  recognition.start();
 }
-draw();
+
+recognition.onresult = async (e)=>{
+  const text = e.results[0][0].transcript;
+  document.getElementById("status").innerText = "You: " + text;
+
+  const res = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key="+API_KEY,
+    {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({
+        contents:[{parts:[{text:text}]}]
+      })
+    }
+  );
+
+  const data = await res.json();
+  const reply = data.candidates[0].content.parts[0].text;
+
+  speak(reply);
+};
+
+function speak(msg){
+  const utter = new SpeechSynthesisUtterance(msg);
+  utter.lang = "en-US";
+  speechSynthesis.speak(utter);
+  document.getElementById("status").innerText = "Jarvis speaking...";
+}
 </script>
 
 </body>
